@@ -278,6 +278,7 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
     }
 
     if (!(self = ((PyTypeObject*) cls)->tp_alloc((PyTypeObject*) cls,fieldc))){
+        free(fieldvalues);
         return NULL;
     }
 
@@ -286,6 +287,7 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
         PyTuple_SET_ITEM((PyTupleObject*) self,n,fieldvalues[n]);
     }
 
+    free(fieldvalues);
     return self;
 }
 
