@@ -696,6 +696,7 @@ static int namedtuple_factory_rename(namedtuple *cls){
             switch(PySet_Contains(seen,asstr)){
             case 1:
                 rename = true;
+                break;
             case -1:
                 Py_DECREF(asstr);
                 Py_DECREF(seen);
@@ -705,18 +706,20 @@ static int namedtuple_factory_rename(namedtuple *cls){
 
         if (rename){
             Py_XDECREF(asstr);
-            free(field);
+            PyMem_Del(field);
 
             if (!(asstr = PyString_FromFormat("_%zu",n))){
                 Py_DECREF(seen);
                 return 1;
             }
-            fieldv[n] = strndup(PyString_AS_STRING(asstr),
-                                PyString_GET_SIZE(asstr));
+            fieldv[n] = pymem_strdup(PyString_AS_STRING(asstr));
         }
 
         // Add the name to the set of seen names.
-        PySet_Add(seen,asstr);
+        if (PySet_Add(seen,asstr)){
+            return NULL;
+        }
+        Py_DECREF(asstr);
     }
 
     Py_DECREF(seen);  // This will decref all the strings it holds.
@@ -746,10 +749,8 @@ static int namedtuple_factory_validate(PyObject *typename,
     const char * const empty_fmt = "Type names and field names cannot be empty";
     const char * const seen_fmt = "Encountered duplicate field name: %s";
 
-
     switch(namedtuple_factory_checkfield(PyString_AS_STRING(typename))){
     case CHECKFIELD_UNDERSCORE:
-        PyErr_Clear();
     case CHECKFIELD_VALID:
         break;
     case CHECKFIELD_NONALNUM:
@@ -953,6 +954,7 @@ static PyObject *namedtuple_factory(PyObject *self,
     }
 
     newtype = PyObject_GC_NewVar(namedtuple,&namedtuple_meta,0);
+    newtype->nt_reprfmt = NULL;
 
     // Dispatch the `namedtuple_populate_fieldnames_*` function based
     // on the type of `field_names`.
