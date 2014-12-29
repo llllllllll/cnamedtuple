@@ -1095,6 +1095,8 @@ PyMethodDef methods[] = {
 
 
 PyMODINIT_FUNC initnamedtuple(){
+    PyObject *none;
+
     if (PyType_Ready(&namedtuple_meta)){
         return;
     }
@@ -1102,4 +1104,9 @@ PyMODINIT_FUNC initnamedtuple(){
     Py_InitModule3("namedtuple",
                    methods,
                    "Fast implementation of namedtuple written in C");
+
+    // Default to an asdict of `dict` instead of `OrderedDict`.
+    if ((none = register_asdict(Py_None,&PyDict_Type))){
+        Py_DECREF(none);
+    }
 }
