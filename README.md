@@ -163,3 +163,37 @@ In [20]: %%timeit
 
 NOTE: The `*_nt_inst == loads(dumps(*_nt_inst))` is to show that it is being
 pickled and unpickled correctly.
+
+
+## Fields lookup ##
+
+
+Time to get the fields as a tuple of strs.
+```python
+In [21]: s_nt._fields
+Out[21]: ('a', 'b', 'c', 'd', 'e', 'f')
+
+In [22]: %%timeit
+   ....: s_nt._fields
+10000000 loops, best of 3: 68.7 ns per loop
+
+In [23]: c_nt._fields
+Out[23]: ('a', 'b', 'c', 'd', 'e', 'f')
+
+In [24]: %%timeit
+   ....: c_nt._fields
+   ....:
+1000000 loops, best of 3: 178 ns per loop
+   ```
+
+
+For the other wins, the `_fields` is constructed from the `nt_fieldv` field of
+the `nametuple` struct when requested. This keeps the memory profile lower by
+not needing to hold onto this `PyTupleObject`. This is slower because the
+`PyTupleObject` and `PyStringObject`s need to be allocated and constructed every
+time. You manually cache it if you will be accessing it frequently.
+
+```python
+In [25]: c_nt._fields is c_nt._fields
+Out[25]: False
+```
