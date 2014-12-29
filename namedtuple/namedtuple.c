@@ -173,7 +173,6 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
     PyObject  *self;
     char     **fieldv;
     Py_ssize_t fieldc;
-    PyObject **fieldvalues;
     char      *keyword;
     Py_ssize_t n;
     Py_ssize_t pos;
@@ -198,6 +197,10 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
     fieldc = ((namedtuple*) cls)->nt_fieldc;
     fieldv = ((namedtuple*) cls)->nt_fieldv;
 
+    if (!(self = ((PyTypeObject*) cls)->tp_alloc((PyTypeObject*) cls,fieldc))){
+        return NULL;
+    }
+
     // Custom argument parsing because of dynamic construction.
     if (nargs + nkwargs > fieldc) {
         PyErr_Format(PyExc_TypeError,
@@ -206,10 +209,9 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
                      fieldc,
                      (fieldc == 1) ? "" : "s",
                      nargs + nkwargs);
+        PyTuple_Type.tp_dealloc(self);
         return NULL;
     }
-
-    fieldvalues = calloc(fieldc,sizeof(PyObject*));
 
     for (n = 0;n < fieldc;n++){
         keyword = fieldv[n];
@@ -222,22 +224,24 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
             if (n < nargs){
                 // Arg present in tuple and in dict.
                 PyErr_Format(PyExc_TypeError,
-                             "Argument given by name ('%s') "
-                             "and position (%zd)",
-                             keyword,n + 1);
-                free(fieldvalues);
+                             "Argument given by name ('%s') and position (%zd)",
+                             keyword,
+                             n + 1);
+                PyTuple_Type.tp_dealloc(self);
                 return NULL;
             }
         }else if (nkwargs && PyErr_Occurred()){
-            free(fieldvalues);
+            PyTuple_Type.tp_dealloc(self);
             return NULL;
         }else if (n < nargs){
-            current_arg = PyTuple_GET_ITEM(args,n);
+            // This reference is stolen when we store it in self.
             Py_INCREF(current_arg);
+            current_arg = PyTuple_GET_ITEM(args,n);
         }
 
         if (current_arg){
-            fieldvalues[n] = current_arg;
+            Py_INCREF(current_arg);
+            PyTuple_SET_ITEM((PyTupleObject*) self,n,current_arg);
             continue;
         }
 
@@ -246,7 +250,7 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
                          "Required argument '%s' (pos %zd) not found",
                          keyword,
                          n + 1);
-            free(fieldvalues);
+            PyTuple_Type.tp_dealloc(self);
             return NULL;
         }
     }
@@ -255,8 +259,9 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
     if (nkwargs > 0) {
         while (PyDict_Next(kwargs,&pos,&key,&value)){
             if (!PyString_Check(key)){
-                PyErr_SetString(PyExc_TypeError,"keywords must be strings");
-                free(fieldvalues);
+                PyErr_SetString(PyExc_TypeError,
+                                "keywords must be strings");
+                PyTuple_Type.tp_dealloc(self);
                 return NULL;
             }
             keyword = PyString_AsString(key);
@@ -271,23 +276,12 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
                              "'%s' is an invalid keyword argument for this "
                              "function",
                              keyword);
-                free(fieldvalues);
+                PyTuple_Type.tp_dealloc(self);
                 return NULL;
             }
         }
     }
 
-    if (!(self = ((PyTypeObject*) cls)->tp_alloc((PyTypeObject*) cls,fieldc))){
-        free(fieldvalues);
-        return NULL;
-    }
-
-    for (n = 0;n < fieldc;n++){
-        Py_INCREF(fieldvalues[n]);
-        PyTuple_SET_ITEM((PyTupleObject*) self,n,fieldvalues[n]);
-    }
-
-    free(fieldvalues);
     return self;
 }
 
