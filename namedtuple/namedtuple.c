@@ -234,13 +234,12 @@ static PyObject *namedtuple_new(PyTypeObject *cls,
             PyTuple_Type.tp_dealloc(self);
             return NULL;
         }else if (n < nargs){
+            current_arg = PyTuple_GET_ITEM(args,n);
             // This reference is stolen when we store it in self.
             Py_INCREF(current_arg);
-            current_arg = PyTuple_GET_ITEM(args,n);
         }
 
         if (current_arg){
-            Py_INCREF(current_arg);
             PyTuple_SET_ITEM((PyTupleObject*) self,n,current_arg);
             continue;
         }
@@ -387,7 +386,9 @@ static PyObject *namedtuple_replace(PyObject *self,
 // The accessor function for lookup up a field by name on a named
 // tuple. The `closure` is the index of the name cast to a `void*`.
 static PyObject *namedtuple_getname(PyObject *self,void *idx){
-    return PyTuple_GET_ITEM(self,(Py_ssize_t) idx);
+    PyObject *item = PyTuple_GET_ITEM(self,(Py_ssize_t) idx);
+    Py_INCREF(item);
+    return item;
 }
 
 
