@@ -56,7 +56,6 @@ Time to instantiate an instance of the new type.
 ```python
 In [6]: s_nt = stdnamedtuple('s_nt', 'a b c d e f')
 
-
 In [7]: %%timeit
    ...: s_nt(1, 2, 3, 4, 5, 6)
    ...:
@@ -71,22 +70,59 @@ In [9]: %%timeit
 ```
 
 
+### Item Access \(index\) ###
+
+
+Time to access elements by index.
+```python
+In [10]: s_nt_inst = s_nt(1, 2, 3, 4, 5, 6)
+
+In [11]: %%timeit
+   ....: s_nt_inst[3]
+   ....:
+10000000 loops, best of 3: 39.8 ns per loop
+
+In [12]: c_nt_inst = c_nt(1, 2, 3, 4, 5, 6)
+
+In [13]: %%timeit
+   ....:c_nt_inst[3]
+   ....:
+10000000 loops, best of 3: 39.5 ns per loop
+```
+
+NOTE: These both just inherit the `__getitem__` from `tuple`; however the C
+inheritance caches the methods on the new type.
+
+
+### Item Acess \(name\) ###
+
+
+Time to access elements by name.
+```python
+In [14]: %%timeit
+   ....: s_nt_inst.f
+   ....:
+10000000 loops, best of 3: 117 ns per loop
+
+In [15]: %%timeit
+   ....: c_nt_inst.f
+   ....:
+10000000 loops, best of 3: 51.7 ns per loop
+```
+
+
 ### Item Replacement ###
 
 
 Time to replace the fields. This creates a new instance of the `*_nt` type.
 
 ```python
-In [10]: s_nt_inst = s_nt(1, 2, 3, 4, 5, 6)
-
-In [11]: %%timeit
+In [16]: %%timeit
    ....: s_nt_inst._replace(a=2, b=3, c=4, d=5, e=6, f=7)
    ....:
 100000 loops, best of 3: 2.79 µs per loop
 
-In [12]: c_nt_inst = c_nt(1, 2, 3, 4, 5, 6)
-
-In [13]: %%timeit
+In [17]: %%timeit
    ....: c_nt_inst._replace(a=2, b=3, c=4, d=5, e=6, f=7)
    ....:
 1000000 loops, best of 3: 1.6 µs per loop
@@ -99,12 +135,12 @@ In [13]: %%timeit
 Time to convert to an `OrderedDict`.
 
 ```python
-In [14]: %%timeit
+In [18]: %%timeit
    ....: s_nt_inst._asdict()
    ....:
 10000 loops, best of 3: 21.8 µs per loop
 
-In [15]: %%timeit
+In [19]: %%timeit
    ....: c_nt_inst._asdict()
    ....:
 10000 loops, best of 3: 21.5 µs per loop
@@ -123,12 +159,12 @@ Time to create a string representation of the instances.
 
 ```python
 
-In [16]: %%timeit
+In [20]: %%timeit
 repr(s_nt_inst)
    ....:
 1000000 loops, best of 3: 780 ns per loop
 
-In [17]: %%timeit
+In [21]: %%timeit
    ....: repr(c_nt_inst)
    ....:
 1000000 loops, best of 3: 494 ns per loop
@@ -142,19 +178,19 @@ This _shouldn't_ be a bottleneck in your application; however, speed is speed.
 Time to pickle and unpickle an instance.
 
 ```python
-In [18]: s_nt_inst == loads(dumps(s_nt_inst))
-Out[18]: True
+In [22]: s_nt_inst == loads(dumps(s_nt_inst))
+Out[22]: True
 
-In [19]: %%timeit
+In [23]: %%timeit
    ....: loads(dumps(s_nt_inst))
    ....:
 10000 loops, best of 3: 24.9 µs per loop
 
 
-In [20]: c_nt_inst == loads(dumps(c_nt_inst))
-Out[20]: True
+In [24]: c_nt_inst == loads(dumps(c_nt_inst))
+Out[24]: True
 
-In [20]: %%timeit
+In [25]: %%timeit
    ....: loads(dumps(c_nt_inst))
    ....:
 100000 loops, best of 3: 9.92 µs per loop
@@ -170,17 +206,17 @@ pickled and unpickled correctly.
 
 Time to get the fields as a tuple of strs.
 ```python
-In [21]: s_nt._fields
-Out[21]: ('a', 'b', 'c', 'd', 'e', 'f')
+In [26]: s_nt._fields
+Out[26]: ('a', 'b', 'c', 'd', 'e', 'f')
 
-In [22]: %%timeit
+In [27]: %%timeit
    ....: s_nt._fields
 10000000 loops, best of 3: 68.7 ns per loop
 
-In [23]: c_nt._fields
-Out[23]: ('a', 'b', 'c', 'd', 'e', 'f')
+In [28]: c_nt._fields
+Out[28]: ('a', 'b', 'c', 'd', 'e', 'f')
 
-In [24]: %%timeit
+In [29]: %%timeit
    ....: c_nt._fields
    ....:
 1000000 loops, best of 3: 178 ns per loop
@@ -194,6 +230,6 @@ not needing to hold onto this `PyTupleObject`. This is slower because the
 time. You manually cache it if you will be accessing it frequently.
 
 ```python
-In [25]: c_nt._fields is c_nt._fields
-Out[25]: False
+In [30]: c_nt._fields is c_nt._fields
+Out[30]: False
 ```
