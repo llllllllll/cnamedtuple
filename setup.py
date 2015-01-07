@@ -2,6 +2,6 @@ from distutils.core import setup, Extension
 
 
 setup(ext_modules=[Extension(
-    "namedtuple",
-    ["namedtuple/namedtuple.c"],
+    "_namedtuple",
+    ["namedtuple/_namedtuple.c"],
 )])
