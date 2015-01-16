@@ -1,12 +1,15 @@
-# namedtuple #
+# cnamedtuple #
 
 
 An implementation of namedtuple written in C for warp speed.
 
-Tested against Python3.4.2 and Python3.50a0.
+Tested against Python3.4.2 and Python3.5 0a0.
 
 
 ## Warp Speed ##
+
+
+Time to go fast.
 
 ### Setup ###
 
@@ -14,18 +17,10 @@ Tested against Python3.4.2 and Python3.50a0.
 Use qualified imports so that we can tell which namedtuple we are using.
 
 ```python
->>> from namedtuple import namedtuple as cnamedtuple, _register_asdict
->>> from collections import namedtuple as stdnamedtuple, OrderedDict
->>> _register_asdict(OrderedDict)
+>>> from namedtuple import namedtuple as cnamedtuple
+>>> from collections import namedtuple as stdnamedtuple
 >>> from pickle import dumps, loads
 ```
-
-NOTE: We need to use `_register_asdict` to pass in `OrderedDict`. The reason for
-this is that I wanted to avoid a cycle between `collections` and `namedtuple` so
-that you could import `namedtuple` from within `collections`.
-
-This function sets what constructor will be used in the `_asdict` method. By
-default, I needed to pick a static object, so I use `PyDict_Type = dict`.
 
 
 ### Standard Library ###
@@ -95,3 +90,20 @@ Running: "dumps(c_nt_inst)"
 Running: "loads(c_nt_inst_dumped)"
 100000 loops, best of 3: 3.82 usec per loop
 ```
+
+
+## Contributing ##
+
+The project is hosted on [github](https://github.com/llllllllll/cnamedtuple).
+
+Before submitting a patch, please make sure your Python code is
+[PEP8](https://www.python.org/dev/peps/pep-0008/) compliant
+and you c code is [PEP7](https://www.python.org/dev/peps/pep-0007/) compliant.
+
+
+## Contact ##
+
+Please file all bug reports on
+[github](https://github.com/llllllllll/cnamedtuple/issues).
+
+For questions or comments, feel free to email me at joe@quantopian.com
