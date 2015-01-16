@@ -1,9 +1,11 @@
 from distutils.core import setup, Extension
+import sys
 
 long_description = None
 
-with open('README.rst') as readme:
-    long_description = readme.read()
+if 'upload' in sys.argv:
+    with open('README.rst') as readme:
+        long_description = readme.read()
 
 setup(
     name='cnamedtuple',

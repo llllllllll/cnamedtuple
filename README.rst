@@ -1,7 +1,7 @@
 cnamedtuple
 ===========
 
-An implementation of namedtuple written in C for warp speed.
+An implementation of namedtuple written in c for warp speed.
 
 Tested against Python3.4.2 and Python3.5 0a0.
 
@@ -98,7 +98,7 @@ The project is hosted on
 `github <https://github.com/llllllllll/cnamedtuple>`__.
 
 Before submitting a patch, please make sure your Python code is
-`PEP8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and you c
+`PEP8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and your c
 code is `PEP7 <https://www.python.org/dev/peps/pep-0007/>`__ compliant.
 
 Contact
