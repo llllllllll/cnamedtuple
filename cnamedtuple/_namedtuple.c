@@ -55,14 +55,43 @@ PyDoc_STRVAR(namedtuple_indexer_doc,
    behaviour. */
 PyTypeObject namedtuple_indexer_type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    .tp_name="NamedtupleIndexerType",
-    .tp_doc=namedtuple_indexer_doc,
-    .tp_new=(newfunc) no_instances_new,
-    .tp_basicsize=sizeof(namedtuple_indexer),
-    .tp_itemsize=0,
-    .tp_flags=Py_TPFLAGS_DEFAULT,
-    .tp_descr_get=namedtuple_indexer_descr_get,
-    .tp_free=PyObject_Del,
+    "_collections.NamedtupleIndexerType",       /* tp_name */
+    sizeof(namedtuple_indexer),                 /* tp_basicsize */
+    0,                                          /* tp_itemsize */
+    0,                                          /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_reserved */
+    0,                                          /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    0,                                          /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
+    namedtuple_indexer_doc,                     /* tp_doc */
+    0,                                          /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    0,                                          /* tp_iter */
+    0,                                          /* tp_iternext */
+    0,                                          /* tp_methods */
+    0,                                          /* tp_members */
+    0,                                          /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+    namedtuple_indexer_descr_get,               /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    (newfunc) no_instances_new,                 /* tp_new */
 };
 
 /* A wrapper around an object to make read-only access to it. */
@@ -109,16 +138,43 @@ PyDoc_STRVAR(namedtuple_descr_wrapper_doc,
 
 PyTypeObject namedtuple_descr_wrapper_type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    .tp_name="NamedtupleDescWrapper",
-    .tp_doc=namedtuple_descr_wrapper_doc,
-    .tp_dealloc=namedtuple_descr_wrapper_dealloc,
-    .tp_new=(newfunc) no_instances_new,
-    .tp_basicsize=sizeof(namedtuple_indexer),
-    .tp_itemsize=0,
-    .tp_flags=Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
-    .tp_descr_get=namedtuple_descr_wrapper_get,
-    .tp_traverse=(traverseproc) namedtuple_descr_wrapper_traverse,
-    .tp_clear=(inquiry) namedtuple_descr_wrapper_clear,
+    "_collections.NamedtupleDescrWrapper",             /* tp_name */
+    sizeof(namedtuple_descr_wrapper),                  /* tp_basicsize */
+    0,                                                 /* tp_itemsize */
+    (destructor) namedtuple_descr_wrapper_dealloc,     /* tp_dealloc */
+    0,                                                 /* tp_print */
+    0,                                                 /* tp_getattr */
+    0,                                                 /* tp_setattr */
+    0,                                                 /* tp_reserved */
+    0,                                                 /* tp_repr */
+    0,                                                 /* tp_as_number */
+    0,                                                 /* tp_as_sequence */
+    0,                                                 /* tp_as_mapping */
+    0,                                                 /* tp_hash */
+    0,                                                 /* tp_call */
+    0,                                                 /* tp_str */
+    PyObject_GenericGetAttr,                           /* tp_getattro */
+    0,                                                 /* tp_setattro */
+    0,                                                 /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,           /* tp_flags */
+    namedtuple_descr_wrapper_doc,                      /* tp_doc */
+    (traverseproc) namedtuple_descr_wrapper_traverse,  /* tp_traverse */
+    (inquiry) namedtuple_descr_wrapper_clear,          /* tp_clear */
+    0,                                                 /* tp_richcompare */
+    0,                                                 /* tp_weaklistoffset */
+    0,                                                 /* tp_iter */
+    0,                                                 /* tp_iternext */
+    0,                                                 /* tp_methods */
+    0,                                                 /* tp_members */
+    0,                                                 /* tp_getset */
+    0,                                                 /* tp_base */
+    0,                                                 /* tp_dict */
+    namedtuple_descr_wrapper_get,                      /* tp_descr_get */
+    0,                                                 /* tp_descr_set */
+    0,                                                 /* tp_dictoffset */
+    0,                                                 /* tp_init */
+    0,                                                 /* tp_alloc */
+    (newfunc) no_instances_new,                        /* tp_new */
 };
 
 /* Gets the `_fields` off a namedtuple. Raises a `TypeError` error if this is
@@ -561,30 +617,30 @@ PyDoc_STRVAR(__reduce_ex___doc,
 "a tuple.");
 
 PyMethodDef namedtuple_methods[] = {
-    {.ml_name="_make",
-     .ml_meth=(PyCFunction) namedtuple__make,
-     .ml_flags=METH_CLASS | METH_VARARGS | METH_KEYWORDS,
-     .ml_doc=_make_doc},
-    {.ml_name="_replace",
-     .ml_meth=(PyCFunction) namedtuple__replace,
-     .ml_flags=METH_VARARGS | METH_KEYWORDS,
-     .ml_doc=_replace_doc},
-    {.ml_name="_asdict",
-     .ml_meth=(PyCFunction) namedtuple__asdict,
-     .ml_flags=METH_NOARGS,
-     .ml_doc=_asdict_doc},
-    {.ml_name="__getnewargs__",
-     .ml_meth=(PyCFunction) namedtuple_getnewargs,
-     .ml_flags=METH_NOARGS,
-     .ml_doc=__getnewargs___doc},
-    {.ml_name="__getstate__",
-     .ml_meth=namedtuple_getstate,
-     .ml_flags=METH_NOARGS,
-     .ml_doc=__getstate___doc},
-    {.ml_name="__reduce_ex__",
-     .ml_meth=namedtuple_reduce_ex,
-     .ml_flags=METH_O,
-     .ml_doc=__reduce_ex___doc},
+    {"_make",
+     (PyCFunction) namedtuple__make,
+     METH_CLASS | METH_VARARGS | METH_KEYWORDS,
+     _make_doc},
+    {"_replace",
+     (PyCFunction) namedtuple__replace,
+     METH_VARARGS | METH_KEYWORDS,
+     _replace_doc},
+    {"_asdict",
+     (PyCFunction) namedtuple__asdict,
+     METH_NOARGS,
+     _asdict_doc},
+    {"__getnewargs__",
+     (PyCFunction) namedtuple_getnewargs,
+     METH_NOARGS,
+     __getnewargs___doc},
+    {"__getstate__",
+     namedtuple_getstate,
+     METH_NOARGS,
+     __getstate___doc},
+    {"__reduce_ex__",
+     namedtuple_reduce_ex,
+     METH_O,
+     __reduce_ex___doc},
     {NULL},
 };
 
@@ -979,35 +1035,37 @@ cache_repr_fmt(PyObject *dict_, PyObject *fields)
 }
 
 PyGetSetDef namedtuple_getsets[] = {
-    {.name="__dict__",
-     .get=namedtuple_get_dict,
-     .set=NULL,
-     .closure=NULL},
+    {"__dict__",
+     namedtuple_get_dict,
+     NULL,
+     NULL},
     {NULL},
 };
 
 PyType_Slot namedtuple_slots[] = {
-    {.slot=Py_tp_new,
-     .pfunc=namedtuple_new},
-    {.slot=Py_tp_methods,
-     .pfunc=namedtuple_methods},
-    {.slot=Py_tp_repr,
-     .pfunc=namedtuple_repr},
-    {.slot=Py_tp_traverse,
-     .pfunc=namedtuple_traverse},
-    {.slot=Py_tp_getset,
-     .pfunc=namedtuple_getsets},
+    {Py_tp_new,
+     namedtuple_new},
+    {Py_tp_methods,
+     namedtuple_methods},
+    {Py_tp_repr,
+     namedtuple_repr},
+    {Py_tp_traverse,
+     namedtuple_traverse},
+    {Py_tp_getset,
+     namedtuple_getsets},
     {0, NULL},
 };
 
 PyType_Spec namedtuple_spec = {
-    .name="",  /* placeholder */
-    .flags=(Py_TPFLAGS_HAVE_GC
-            | Py_TPFLAGS_TUPLE_SUBCLASS
-            | Py_TPFLAGS_HEAPTYPE
-            | Py_TPFLAGS_BASETYPE
-            | Py_TPFLAGS_DEFAULT),
-    .slots=namedtuple_slots,
+    "",  /* placeholder */
+    0,
+    0,
+    Py_TPFLAGS_HAVE_GC
+    | Py_TPFLAGS_TUPLE_SUBCLASS
+    | Py_TPFLAGS_HEAPTYPE
+    | Py_TPFLAGS_BASETYPE
+    | Py_TPFLAGS_DEFAULT,
+    namedtuple_slots,
 };
 
 _Py_IDENTIFIER(__module__);
