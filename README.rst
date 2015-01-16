@@ -98,8 +98,8 @@ The project is hosted on
 `github <https://github.com/llllllllll/cnamedtuple>`__.
 
 Before submitting a patch, please make sure your Python code is
-`PEP8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and you c
-code is `PEP7 <https://www.python.org/dev/peps/pep-0007/>`__ compliant.
+`PEP 8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and your C
+code is `PEP 7 <https://www.python.org/dev/peps/pep-0007/>`__ compliant.
 
 Contact
 -------
