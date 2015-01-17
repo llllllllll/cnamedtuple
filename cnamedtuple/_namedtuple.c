@@ -38,8 +38,18 @@ namedtuple_indexer_descr_get(PyObject *self,
         ret = self;
     }
     else {
-        /* The contract is that `id_idx` is a valid index. */
-        ret = PyTuple_GET_ITEM(instance, ((namedtuple_indexer*) self)->id_idx);
+        /* Assert that this is a tuple subclass. */
+        if (!PyTuple_Check(instance)) {
+            PyErr_Format(PyExc_TypeError,
+                         "%s objects can only be used on tuple types",
+                         ((PyTypeObject*) self->ob_type)->tp_name);
+            return NULL;
+        }
+
+        if (!(ret = PyTuple_GetItem(instance,
+                                    ((namedtuple_indexer*) self)->id_idx))) {
+            return NULL;
+        }
     }
 
     Py_INCREF(ret);
@@ -55,7 +65,7 @@ PyDoc_STRVAR(namedtuple_indexer_doc,
    behaviour. */
 PyTypeObject namedtuple_indexer_type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    "_collections.NamedtupleIndexerType",       /* tp_name */
+    "_collections.NamedTupleIndexerType",       /* tp_name */
     sizeof(namedtuple_indexer),                 /* tp_basicsize */
     0,                                          /* tp_itemsize */
     0,                                          /* tp_dealloc */
@@ -138,7 +148,7 @@ PyDoc_STRVAR(namedtuple_descr_wrapper_doc,
 
 PyTypeObject namedtuple_descr_wrapper_type = {
     PyVarObject_HEAD_INIT(&PyType_Type, 0)
-    "_collections.NamedtupleDescrWrapper",             /* tp_name */
+    "_collections.NamedTupleDescrWrapper",             /* tp_name */
     sizeof(namedtuple_descr_wrapper),                  /* tp_basicsize */
     0,                                                 /* tp_itemsize */
     (destructor) namedtuple_descr_wrapper_dealloc,     /* tp_dealloc */
