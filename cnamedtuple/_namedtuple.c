@@ -986,6 +986,7 @@ add_indexers(PyObject *dict_, PyObject *fields)
                            (PyObject*) indexer)) {
             return -1;
         }
+        Py_DECREF(indexer);
     }
 
     return 0;
@@ -1154,6 +1155,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
+    Py_DECREF(descr);
 
     /* Add an empty '__slots__' */
     if (!(descr = PyObject_GC_New(namedtuple_descr_wrapper,
@@ -1169,6 +1171,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
+    Py_DECREF(descr);
 
     /* Add the `__reprfmt__` and `tp_doc`.*/
     if (cache_repr_fmt(dict_, field_names)) {
