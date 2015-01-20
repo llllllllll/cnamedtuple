@@ -6,7 +6,7 @@ __all__ = [
     'namedtuple'
 ]
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 # Register `OrderedDict` as the constructor to use when calling `_asdict`.
 # This step exists because there is currently work being done to move this into
