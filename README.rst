@@ -21,75 +21,50 @@ Use qualified imports so that we can tell which namedtuple we are using.
     >>> from collections import namedtuple as stdnamedtuple
     >>> from pickle import dumps, loads
 
-Standard Library
-~~~~~~~~~~~~~~~~
+Little numbers
+~~~~~~~~~~~~~~
 
-::
+Cute graphs
+^^^^^^^^^^^
 
-    Running: "stdnamedtuple('std_nt_type', 'a b c d e f')"
-    1000 loops, best of 3: 769 usec per loop
+These operations scale with the number of fields.
 
-    Running: "stdnamedtuple('std_nt_type', ('a', 'b', 'c', 'd', 'e', 'f'))"
-    1000 loops, best of 3: 771 usec per loop
+.. figure:: https://raw.githubusercontent.com/llllllllll/cnamedtuple/master/prof/type_creation_string.png
+   :alt: Type creation from a string of field names.
 
-    Running: "std_nt_type(1, 2, 3, 4, 5, 6)"
-    1000000 loops, best of 3: 1.04 usec per loop
+   Type creation from a string of field names.
+.. figure:: https://raw.githubusercontent.com/llllllllll/cnamedtuple/master/prof/type_creation_seq.png
+   :alt: Type creation from a sequence of field names.
 
-    Running: "std_nt_inst.c"
-    10000000 loops, best of 3: 0.12 usec per loop
+   Type creation from a sequence of field names.
+.. figure:: https://raw.githubusercontent.com/llllllllll/cnamedtuple/master/prof/instance_creation.png
+   :alt: Type creation from a sequence of field names.
 
-    Running: "std_nt_inst[3]"
-    10000000 loops, best of 3: 0.0532 usec per loop
+   Type creation from a sequence of field names.
 
-    Running: "std_nt_inst._replace(a=2, b=3, c=4, d=5, e=6, f=7)"
-    100000 loops, best of 3: 3.19 usec per loop
 
-    Running: "std_nt_inst._asdict()"
-    10000 loops, best of 3: 26.2 usec per loop
+Less cute numbers
+^^^^^^^^^^^^^^^^^
 
-    Running: "repr(std_nt_inst)"
-    1000000 loops, best of 3: 1.59 usec per loop
+These operations do not scale with number of fields.
 
-    Running: "dumps(std_nt_inst)"
-    100000 loops, best of 3: 7.74 usec per loop
+``std_inst`` is an instance of a ``collections.namedtuple`` created type
+with six named fields: a, b, c, d, e, and f.
 
-    Running: "loads(std_nt_inst_dumped)"
-    100000 loops, best of 3: 4.46 usec per loop
+.. code:: python
 
-This Implementation
-~~~~~~~~~~~~~~~~~~~
+    In [1]: %%timeit
+       ...: std_inst.c
+    10000000 loops, best of 3: 108 ns per loop
 
-::
+``c_inst`` is an instance of a ``cnamedtuple.namedtuple`` created type
+with six named fields: a, b, c, d, e, and f.
 
-    Running: "cnamedtuple('c_nt_type', 'a b c d e f')"
-    100000 loops, best of 3: 18.8 usec per loop
+.. code:: python
 
-    Running: "cnamedtuple('c_nt_type', ('a', 'b', 'c', 'd', 'e', 'f'))"
-    100000 loops, best of 3: 18.5 usec per loop
-
-    Running: "c_nt_type(1, 2, 3, 4, 5, 6)"
-    1000000 loops, best of 3: 0.709 usec per loop
-
-    Running: "c_nt_inst.c"
-    10000000 loops, best of 3: 0.0657 usec per loop
-
-    Running: "c_nt_inst[3]"
-    10000000 loops, best of 3: 0.0523 usec per loop
-
-    Running: "c_nt_inst._replace(a=2, b=3, c=4, d=5, e=6, f=7)"
-    1000000 loops, best of 3: 1.85 usec per loop
-
-    Running: "c_nt_inst._asdict()"
-    10000 loops, best of 3: 25.9 usec per loop
-
-    Running: "repr(c_nt_inst)"
-    1000000 loops, best of 3: 1.32 usec per loop
-
-    Running: "dumps(c_nt_inst)"
-    100000 loops, best of 3: 5.72 usec per loop
-
-    Running: "loads(c_nt_inst_dumped)"
-    100000 loops, best of 3: 3.82 usec per loop
+    In [2]: %%timeit
+       ...: c_inst.c
+    10000000 loops, best of 3: 47.8 ns per loop
 
 Contributing
 ------------
@@ -98,8 +73,9 @@ The project is hosted on
 `github <https://github.com/llllllllll/cnamedtuple>`__.
 
 Before submitting a patch, please make sure your Python code is
-`PEP8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and your c
-code is `PEP7 <https://www.python.org/dev/peps/pep-0007/>`__ compliant.
+`PEP8 <https://www.python.org/dev/peps/pep-0008/>`__ compliant and your
+c code is `PEP7 <https://www.python.org/dev/peps/pep-0007/>`__
+compliant.
 
 Contact
 -------
