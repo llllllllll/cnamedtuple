@@ -1,4 +1,4 @@
-cnamedtuple 0.1.2
+cnamedtuple 0.1.4
 =================
 
 An implementation of namedtuple written in c for warp speed.
@@ -38,9 +38,9 @@ These operations scale with the number of fields.
 
    Type creation from a sequence of field names.
 .. figure:: https://raw.githubusercontent.com/llllllllll/cnamedtuple/master/prof/instance_creation.png
-   :alt: Type creation from a sequence of field names.
+   :alt: Instance creation.
 
-   Type creation from a sequence of field names.
+   Instance creation.
 
 
 Less cute numbers

@@ -9,7 +9,7 @@ if 'upload' in sys.argv:
 
 setup(
     name='cnamedtuple',
-    version='0.1.3',
+    version='0.1.4',
     description='collections.namedtuple implemented in c.',
     author='Joe Jevnik',
     author_email='joe@quantopian.com',
@@ -28,7 +28,7 @@ setup(
         'Operating System :: OS Independent',
         'Topic :: Utilities',
     ],
-    url="https://github.com/llllllllll/namedtuple",
+    url="https://github.com/llllllllll/cnamedtuple",
     ext_modules=[
         Extension('cnamedtuple._namedtuple', ['cnamedtuple/_namedtuple.c']),
     ],
