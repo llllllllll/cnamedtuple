@@ -15,16 +15,6 @@ typedef struct{
     Py_ssize_t id_idx;  /* The index that this will access. */
 }namedtuple_indexer;
 
-/* Raise an exception if `__new__` is called. */
-static PyObject *
-no_instances_new(PyObject *cls, PyObject *args, PyObject *kwargs)
-{
-    PyErr_Format(PyExc_TypeError,
-                 "Cannot create instances of %s",
-                 ((PyTypeObject*) cls)->tp_name);
-    return NULL;
-}
-
 /* Index a tuple at `self`'s index like a specialized `itemgetter`. */
 static PyObject *
 namedtuple_indexer_descr_get(PyObject *self,
@@ -101,7 +91,7 @@ PyTypeObject namedtuple_indexer_type = {
     0,                                          /* tp_dictoffset */
     0,                                          /* tp_init */
     0,                                          /* tp_alloc */
-    (newfunc) no_instances_new,                 /* tp_new */
+    0,                                          /* tp_new */
 };
 
 /* A wrapper around an object to make read-only access to it. */
@@ -184,7 +174,7 @@ PyTypeObject namedtuple_descr_wrapper_type = {
     0,                                                 /* tp_dictoffset */
     0,                                                 /* tp_init */
     0,                                                 /* tp_alloc */
-    (newfunc) no_instances_new,                        /* tp_new */
+    0,                                                 /* tp_new */
 };
 
 /* Gets the `_fields` off a namedtuple. Raises a `TypeError` error if this is
