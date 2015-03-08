@@ -9,7 +9,7 @@ if 'upload' in sys.argv:
 
 setup(
     name='cnamedtuple',
-    version='0.1.4',
+    version='0.1.5',
     description='collections.namedtuple implemented in c.',
     author='Joe Jevnik',
     author_email='joe@quantopian.com',

@@ -1,4 +1,4 @@
-cnamedtuple 0.1.4
+cnamedtuple 0.1.5
 =================
 
 An implementation of namedtuple written in c for warp speed.
