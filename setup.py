@@ -30,6 +30,15 @@ setup(
     ],
     url="https://github.com/llllllllll/cnamedtuple",
     ext_modules=[
-        Extension('cnamedtuple._namedtuple', ['cnamedtuple/_namedtuple.c']),
+        Extension(
+            'cnamedtuple._namedtuple',
+            ['cnamedtuple/_namedtuple.c'],
+            extra_compile_args=[
+                '-Wall',
+                '-Wextra',
+                '-Wno-unused-parameter',
+                '-Wno-missing-field-initializers',
+            ],
+        ),
     ],
 )
