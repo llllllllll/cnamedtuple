@@ -104,7 +104,7 @@ static void
 namedtuple_descr_wrapper_dealloc(PyObject *self)
 {
     Py_CLEAR(((namedtuple_descr_wrapper*) self)->wr_wrapped);
-    PyObject_GC_Del(self);
+    PyObject_Del(self);
 }
 
 /* Retrieve the wrapped object. Because this will return the object even
@@ -117,20 +117,6 @@ namedtuple_descr_wrapper_get(PyObject *self,
     PyObject *ret = ((namedtuple_descr_wrapper*) self)->wr_wrapped;
     Py_INCREF(ret);
     return ret;
-}
-
-static int
-namedtuple_descr_wrapper_traverse(PyObject *self, visitproc visit, void *arg)
-{
-    Py_VISIT(((namedtuple_descr_wrapper*) self)->wr_wrapped);
-    return 0;
-}
-
-static int
-namedtuple_descr_wrapper_clear(PyObject *self)
-{
-    Py_CLEAR(((namedtuple_descr_wrapper*) self)->wr_wrapped);
-    return 0;
 }
 
 PyDoc_STRVAR(namedtuple_descr_wrapper_doc,
@@ -156,10 +142,10 @@ PyTypeObject namedtuple_descr_wrapper_type = {
     PyObject_GenericGetAttr,                           /* tp_getattro */
     0,                                                 /* tp_setattro */
     0,                                                 /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,           /* tp_flags */
+    Py_TPFLAGS_DEFAULT,                                /* tp_flags */
     namedtuple_descr_wrapper_doc,                      /* tp_doc */
-    (traverseproc) namedtuple_descr_wrapper_traverse,  /* tp_traverse */
-    (inquiry) namedtuple_descr_wrapper_clear,          /* tp_clear */
+    0,                                                 /* tp_traverse */
+    0,                                                 /* tp_clear */
     0,                                                 /* tp_richcompare */
     0,                                                 /* tp_weaklistoffset */
     0,                                                 /* tp_iter */
@@ -1136,8 +1122,8 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     }
 
     /* Add the field descriptor. */
-    if (!(descr = PyObject_GC_New(namedtuple_descr_wrapper,
-                                  &namedtuple_descr_wrapper_type))) {
+    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
+                               &namedtuple_descr_wrapper_type))) {
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
@@ -1149,8 +1135,8 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     Py_DECREF(descr);
 
     /* Add an empty '__slots__' */
-    if (!(descr = PyObject_GC_New(namedtuple_descr_wrapper,
-                                         &namedtuple_descr_wrapper_type))) {
+    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
+                               &namedtuple_descr_wrapper_type))) {
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
