@@ -170,7 +170,7 @@ static PyObject *
 get_fields(PyObject *self) {
     PyObject *fields;
 
-    if (!(fields = PyObject_GetAttrString((PyObject*) self, "_fields"))) {
+    if (!(fields = PyObject_GetAttrString(self, "_fields"))) {
         return NULL;
     }
 
