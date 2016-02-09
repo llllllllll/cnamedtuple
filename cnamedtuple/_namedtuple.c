@@ -215,10 +215,12 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
                      "Cannot pass more than %d arguments to %U",
                      BUFSIZ,
                      ((PyHeapTypeObject*) cls)->ht_name);
+        Py_DECREF(fields);
         return NULL;
     }
 
     if (!(self = PyTuple_Type.tp_alloc(cls, fieldc))) {
+        Py_DECREF(fields);
         return NULL;
     }
 
@@ -230,15 +232,15 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
                      fieldc,
                      (fieldc == 1) ? "" : "s",
                      nargs + nkwargs);
-        PyTuple_Type.tp_dealloc(self);
-        return NULL;
+
+        goto error;
     }
 
     for (n = 0;n < fieldc;n++) {
         keyword = PyTuple_GET_ITEM(fields, n);
         current_arg = NULL;
         if (nkwargs) {
-            current_arg = PyDict_GetItem(kwargs,keyword);
+            current_arg = PyDict_GetItem(kwargs, keyword);
         }
         if (current_arg) {
             --nkwargs;
@@ -248,13 +250,11 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
                              "Argument given by name ('%U') and position (%zd)",
                              keyword,
                              n + 1);
-                PyTuple_Type.tp_dealloc(self);
-                return NULL;
+                goto error;
             }
         }
         else if (nkwargs && PyErr_Occurred()) {
-            PyTuple_Type.tp_dealloc(self);
-            return NULL;
+            goto error;
         }
         else if (n < nargs) {
             current_arg = PyTuple_GET_ITEM(args,n);
@@ -272,8 +272,7 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
                          "Required argument '%U' (pos %zd) not found",
                          keyword,
                          n + 1);
-            PyTuple_Type.tp_dealloc(self);
-            return NULL;
+            goto error;
         }
     }
 
@@ -284,8 +283,7 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
             if (!PyUnicode_Check(key)) {
                 PyErr_SetString(PyExc_TypeError,
                                 "keywords must be strings");
-                PyTuple_Type.tp_dealloc(self);
-                return NULL;
+                goto error;
             }
             for (n = 0;n < fieldc;++n) {
                 if (!PyUnicode_Compare(key, PyTuple_GET_ITEM(fields, n))) {
@@ -298,14 +296,18 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
                              "'%U' is an invalid keyword argument for this "
                              "function",
                              key);
-                PyTuple_Type.tp_dealloc(self);
-                return NULL;
+                goto error;
             }
         }
     }
 
     Py_DECREF(fields);
     return self;
+error:
+
+    Py_DECREF(fields);
+    PyTuple_Type.tp_dealloc(self);
+    return NULL;
 }
 
 /* Namedtuple class method for creating new instances from an iterable.
@@ -1041,6 +1043,8 @@ PyType_Slot namedtuple_slots[] = {
      namedtuple_traverse},
     {Py_tp_getset,
      namedtuple_getsets},
+    {Py_tp_base,
+     &PyTuple_Type},
     {0, NULL},
 };
 
@@ -1056,8 +1060,6 @@ PyType_Spec namedtuple_spec = {
     namedtuple_slots,
 };
 
-_Py_IDENTIFIER(__module__);
-
 /* namedtuple factory function.
  * return: A new reference to a new namedtuple type or NULL on failure. */
 static PyObject *
@@ -1072,12 +1074,11 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     module_state *st = PyModule_GetState(self);
     PyObject *typename = NULL;
     PyObject *field_names = NULL;
-    int rename = NULL;
+    int rename = 0;
     PyTypeObject *newtype;
     PyObject *globals;
     PyObject *module_name;
     namedtuple_descr_wrapper *descr;
-    PyObject *bases;
     PyObject *dict_;
     int err;
 
@@ -1105,11 +1106,11 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         return NULL;
     }
 
-    bases = PyTuple_Pack(1, &PyTuple_Type);
     namedtuple_spec.name = PyUnicode_AsUTF8(typename);
-    newtype = (PyTypeObject*) PyType_FromSpecWithBases(&namedtuple_spec, bases);
+    newtype = (PyTypeObject*) PyType_FromSpec(&namedtuple_spec);
     Py_DECREF(typename);
     if (!newtype) {
+        Py_DECREF(field_names);
         return NULL;
     }
 
@@ -1117,6 +1118,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
 
     /* Add indexers for each name. */
     if (add_indexers(dict_, field_names)) {
+        Py_DECREF(field_names);
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
@@ -1124,15 +1126,17 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     /* Add the field descriptor. */
     if (!(descr = PyObject_New(namedtuple_descr_wrapper,
                                &namedtuple_descr_wrapper_type))) {
+        Py_DECREF(field_names);
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
     descr->wr_wrapped = field_names;
-    if (PyDict_SetItemString(dict_, "_fields", (PyObject*) descr)) {
+    err = PyDict_SetItemString(dict_, "_fields", (PyObject*) descr);
+    Py_DECREF(descr);
+    if (err) {
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
-    Py_DECREF(descr);
 
     /* Add an empty '__slots__' */
     if (!(descr = PyObject_New(namedtuple_descr_wrapper,
@@ -1144,11 +1148,12 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
-    if (PyDict_SetItemString(dict_, "__slots__", (PyObject*) descr)) {
+    err = PyDict_SetItemString(dict_, "__slots__", (PyObject*) descr);
+    Py_DECREF(descr);
+    if (err) {
         PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
-    Py_DECREF(descr);
 
     /* Add the `__reprfmt__` and `tp_doc`.*/
     if (cache_repr_fmt(dict_, field_names)) {
@@ -1173,7 +1178,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         module_name = PyUnicode_InternFromString("");
     }
     /* Replace the `__module__` with the actual module. */
-    err = _PyDict_SetItemId(dict_, &PyId___module__, module_name);
+    err = PyDict_SetItemString(dict_, "__module__", module_name);
     Py_DECREF(module_name);
     if (err) {
         PyType_Type.tp_dealloc((PyObject*) newtype);
