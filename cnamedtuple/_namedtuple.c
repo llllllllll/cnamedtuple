@@ -318,6 +318,7 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
         }
     }
 
+    Py_DECREF(fields);
     return self;
 }
 
