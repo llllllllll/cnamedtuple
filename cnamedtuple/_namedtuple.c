@@ -364,6 +364,7 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
         PyErr_Format(PyExc_TypeError,
                      "_replace takes no positional arguments (%zd given)",
                      PyTuple_GET_SIZE(args));
+        Py_DECREF(fields);
         return NULL;
     }
 
@@ -375,6 +376,7 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     if (!(items = PyTuple_New(fieldc))) {
+        Py_DECREF(fields);
         return NULL;
     }
 
@@ -399,12 +401,14 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
         errstr = PyUnicode_Format(tstr, ttuple);
         Py_DECREF(ttuple);
         PyErr_SetObject(PyExc_ValueError, errstr);
+        Py_DECREF(fields);
         return NULL;
     }
 
     ret = namedtuple__make((PyObject*) self->ob_type,
                            Py_BuildValue("(N)", items),
                            NULL);
+    Py_DECREF(fields);
     Py_DECREF(items);
     return ret;
 }
@@ -435,6 +439,7 @@ namedtuple_repr(PyObject *self, PyObject *_)
 
     len = PyTuple_GET_SIZE(self);
     if (!(args = PyTuple_New(len + 1))) {
+        Py_DECREF(reprfmt);
         return NULL;
     }
 
@@ -448,6 +453,7 @@ namedtuple_repr(PyObject *self, PyObject *_)
     }
 
     ret = PyUnicode_Format(reprfmt, args);
+    Py_DECREF(reprfmt);
     Py_DECREF(args);
     return ret;
 }
@@ -470,6 +476,7 @@ namedtuple__asdict(PyObject *self, PyObject *_)
     fieldc = PyTuple_GET_SIZE(fields);
 
     if (!(args = PyTuple_New(fieldc))) {
+        Py_DECREF(fields);
         return NULL;
     }
     for (n = 0;n < fieldc;++n) {
@@ -477,10 +484,12 @@ namedtuple__asdict(PyObject *self, PyObject *_)
                                  PyTuple_GET_ITEM(fields, n),
                                  PyTuple_GET_ITEM(self, n)))) {
             Py_DECREF(args);
+            Py_DECREF(fields);
             return NULL;
         }
         PyTuple_SET_ITEM(args, n, ret);
     }
+    Py_DECREF(fields);
 
     if (!(asdict = PyObject_GetAttrString(self, "__asdict__"))) {
         Py_DECREF(args);
@@ -488,6 +497,7 @@ namedtuple__asdict(PyObject *self, PyObject *_)
     }
 
     ret = PyObject_CallFunctionObjArgs(asdict, args, NULL);
+    Py_DECREF(asdict);
     Py_DECREF(args);
     return ret;
 }
@@ -514,12 +524,15 @@ static PyObject *
 namedtuple_reduce_ex(PyObject *self,PyObject *_)
 {
     PyObject *astuple = PySequence_Tuple(self);
+    PyObject *ret;
 
     if (!astuple) {
         return NULL;
     }
 
-    return PyTuple_Pack(2, self->ob_type, astuple);
+    ret = PyTuple_Pack(2, self->ob_type, astuple);
+    Py_DECREF(astuple);
+    return ret;
 }
 
 static int
@@ -650,10 +663,15 @@ build_fields(PyObject *field_names)
     /* If the `field_names` is a `str`, then we will replace all ',' with ' '
        and then split it on whitespace to get the sequence of fields. */
     if (PyUnicode_Check(field_names)) {
-         comma = PyUnicode_InternFromString(",");
-         space = PyUnicode_InternFromString(" ");
+        if (!(comma = PyUnicode_InternFromString(","))) {
+            return NULL;
+        }
+        if (!(space = PyUnicode_InternFromString(" "))) {
+            Py_DECREF(comma);
+            return NULL;
+        }
 
-         /* Replace all instances of ',' with ' '. */
+        /* Replace all instances of ',' with ' '. */
         with_replace = PyUnicode_Replace(field_names, comma, space, -1);
         Py_DECREF(comma);
         Py_DECREF(space);
@@ -673,7 +691,9 @@ build_fields(PyObject *field_names)
     else {
         /* The `field_names` is a sequence already, just convert it into a
            tuple. */
-        tmp_fields = PySequence_Tuple(field_names);
+        if (!(tmp_fields = PySequence_Tuple(field_names))) {
+            return NULL;
+        }
     }
 
     fast_fields = PySequence_Fast(tmp_fields, "field_names must be a sequence");
@@ -807,9 +827,9 @@ rename_fields(PyObject *iskeyword, PyObject *fields)
 
         if (rename) {
             Py_DECREF(field);
+            PyTuple_SET_ITEM(fields, n, NULL);
 
             if (!(field = PyUnicode_FromFormat("_%zu", n))) {
-                PyTuple_SET_ITEM(fields, n, NULL);
                 Py_DECREF(seen);
                 return -1;
             }
@@ -818,6 +838,7 @@ rename_fields(PyObject *iskeyword, PyObject *fields)
 
         /* Add the name to the set of seen names. */
         if (PySet_Add(seen, field)) {
+            Py_DECREF(seen);
             return -1;
         }
     }
@@ -862,6 +883,7 @@ validate_field_names(PyObject *typename,
     }
 
     if (rename_fields(iskeyword, fields)) {
+        Py_DECREF(fields);
         return -1;
     }
 
@@ -871,22 +893,28 @@ validate_field_names(PyObject *typename,
         break;
     case CHECKFIELD_NONALNUM:
         PyErr_Format(PyExc_ValueError,nonalnum_fmt,typename);
+        Py_DECREF(fields);
         return -1;
     case CHECKFIELD_KEYWORD:
         PyErr_Format(PyExc_ValueError,keyword_fmt,typename);
+        Py_DECREF(fields);
         return -1;
     case CHECKFIELD_DIGIT:
         PyErr_Format(PyExc_ValueError,digit_fmt,typename);
+        Py_DECREF(fields);
         return -1;
     case CHECKFIELD_EMPTY:
         PyErr_SetString(PyExc_ValueError,empty_type_fmt);
+        Py_DECREF(fields);
         return -1;
     case CHECKFIELD_NOTREADY:
         PyErr_SetString(PyExc_ValueError,notready_fmt);
+        Py_DECREF(fields);
         return -1;
     }
 
     if (!(seen = PySet_New(NULL))) {
+        Py_DECREF(fields);
         return 1;
     }
 
@@ -900,40 +928,50 @@ validate_field_names(PyObject *typename,
         case CHECKFIELD_UNDERSCORE:
             if (!rename) {
                 PyErr_Format(PyExc_ValueError, underscore_fmt, field);
+                Py_DECREF(fields);
+                Py_DECREF(seen);
                 return -1;
             }
             break;
         case CHECKFIELD_NONALNUM:
             PyErr_Format(PyExc_ValueError, nonalnum_fmt, field);
+            Py_DECREF(fields);
             Py_DECREF(seen);
             return -1;
         case CHECKFIELD_KEYWORD:
             PyErr_Format(PyExc_ValueError, keyword_fmt, field);
+            Py_DECREF(fields);
             Py_DECREF(seen);
             return -1;
         case CHECKFIELD_DIGIT:
             PyErr_Format(PyExc_ValueError, digit_fmt, field);
+            Py_DECREF(fields);
             Py_DECREF(seen);
             return -1;
         case CHECKFIELD_EMPTY:
             PyErr_Format(PyExc_ValueError, empty_field_fmt, n);
+            Py_DECREF(fields);
+            Py_DECREF(seen);
             return -1;
         case CHECKFIELD_NOTREADY:
             PyErr_SetString(PyExc_ValueError, notready_fmt);
+            Py_DECREF(fields);
+            Py_DECREF(seen);
             return -1;
         }
 
         switch(PySet_Contains(seen, field)) {
         case 1:
             PyErr_Format(PyExc_ValueError, seen_fmt, field);
-            Py_DECREF(seen);
-            return -1;
+            /* explicit fallthrough */
         case -1:
+            Py_DECREF(fields);
             Py_DECREF(seen);
             return -1;
         }
 
         if (PySet_Add(seen, field)) {
+            Py_DECREF(fields);
             Py_DECREF(seen);
             return -1;
         }
@@ -992,7 +1030,6 @@ cache_repr_fmt(PyObject *dict_, PyObject *fields)
     if (!(field_fmts = PyTuple_New(fieldc))) {
         return -1;
     }
-
 
     for (n = 0;n < fieldc;++n) {
         if (!(field_fmt = PyUnicode_FromFormat("%U=%%r",
@@ -1082,6 +1119,11 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     PyObject *dict_;
     int err;
 
+    if (!st) {
+        PyErr_SetString(PyExc_AssertionError, "module state is NULL");
+        return NULL;
+    }
+
     if (!PyArg_ParseTupleAndKeywords(args,
                                      kwargs,
                                      "OO|p:namedtuple",
@@ -1108,6 +1150,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
 
     namedtuple_spec.name = PyUnicode_AsUTF8(typename);
     newtype = (PyTypeObject*) PyType_FromSpec(&namedtuple_spec);
+    newtype->tp_name = PyUnicode_AsUTF8(((PyHeapTypeObject*) newtype)->ht_name);
     Py_DECREF(typename);
     if (!newtype) {
         Py_DECREF(field_names);
