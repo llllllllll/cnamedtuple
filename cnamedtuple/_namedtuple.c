@@ -877,9 +877,11 @@ validate_field_names(PyObject *typename,
         return -1;
     }
 
-    if (rename_fields(iskeyword, fields)) {
-        Py_DECREF(fields);
-        return -1;
+    if (rename) {
+        if (rename_fields(iskeyword, fields)) {
+            Py_DECREF(fields);
+            return -1;
+        }
     }
 
     switch(checkfield(iskeyword, typename)) {
