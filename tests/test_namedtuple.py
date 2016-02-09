@@ -36,6 +36,7 @@ class TestNamedTuple(unittest.TestCase):
         self.assertRaises(ValueError, namedtuple, 'abc', '8efg 9ghi')      # field starts with digit
         self.assertRaises(ValueError, namedtuple, 'abc', '_efg ghi')       # field with leading underscore
         self.assertRaises(ValueError, namedtuple, 'abc', 'efg efg ghi')    # duplicate field
+        self.assertRaises(ValueError, namedtuple, 'abc', '?a')             # non alnum starting char
 
         namedtuple('Point0', 'x1 y2')   # Verify that numbers are allowed in names
         namedtuple('_', 'a b c')        # Test leading underscores in a typename
