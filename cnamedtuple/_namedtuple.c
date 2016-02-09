@@ -8,6 +8,13 @@ typedef struct{
     PyObject *asdict;     /* The constructor called from `_asdict`. */
 }module_state;
 
+/* These are not in the module state because we need this around even if the
+   module is not. */
+static PyObject *tp_names_callback;  /* The callback to pass to ref. */
+static PyObject *tp_names;           /* dict mapping weakref objects to the
+                                        unicode objects supporting the tp_name
+                                        fields of the created types. */
+
 /* The type of the descriptors that access the named fields of the `namedtuple`
    types. */
 typedef struct{
@@ -210,19 +217,13 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
 
     nargs = PyTuple_GET_SIZE(args);
     nkwargs = (kwargs) ? PyDict_Size(kwargs) : 0;
-    if (nargs + nkwargs > BUFSIZ) {
-        PyErr_Format(PyExc_TypeError,
-                     "Cannot pass more than %d arguments to %U",
-                     BUFSIZ,
-                     ((PyHeapTypeObject*) cls)->ht_name);
-        Py_DECREF(fields);
-        return NULL;
-    }
 
-    if (!(self = PyTuple_Type.tp_alloc(cls, fieldc))) {
+    if (!(self = cls->tp_alloc(cls, fieldc))) {
         Py_DECREF(fields);
         return NULL;
     }
+    /* zero the tuple so we can decref at any time */
+    memset(((PyTupleObject*) self)->ob_item, 0, sizeof(PyObject*) * fieldc);
 
     // Custom argument parsing because of dynamic construction.
     if (nargs + nkwargs > fieldc) {
@@ -306,7 +307,7 @@ namedtuple_new(PyTypeObject *cls, PyObject *args, PyObject *kwargs)
 error:
 
     Py_DECREF(fields);
-    PyTuple_Type.tp_dealloc(self);
+    Py_DECREF(self);
     return NULL;
 }
 
@@ -343,13 +344,11 @@ namedtuple__make(PyObject *cls, PyObject *args, PyObject *kwargs)
 static PyObject *
 namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+    PyObject *arg;
     PyObject *items;
     PyObject *item;
     PyObject *ret;
-    PyObject *tstr;
     PyObject *tkeys;
-    PyObject *ttuple;
-    PyObject *errstr;
     Py_ssize_t n;
     PyObject *fields;
     Py_ssize_t fieldc;
@@ -370,9 +369,13 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
 
     if (!kwargs) {
         /* Fast path if nothing needs to be replaced, just copy. */
-        return namedtuple__make((PyObject*) self->ob_type,
-                                Py_BuildValue("(N)", self),
-                                NULL);
+        if (!(arg = PyTuple_Pack(1, self))) {
+            Py_DECREF(fields);
+            return NULL;
+        }
+        ret = namedtuple__make((PyObject*) self->ob_type, arg, NULL);
+        Py_DECREF(arg);
+        return ret;
     }
 
     if (!(items = PyTuple_New(fieldc))) {
@@ -385,7 +388,7 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
             item = PyTuple_GET_ITEM(self, n);
         }
         else {
-            PyDict_DelItem(kwargs,PyTuple_GET_ITEM(fields, n));
+            PyDict_DelItem(kwargs, PyTuple_GET_ITEM(fields, n));
         }
 
         Py_INCREF(item);
@@ -393,23 +396,23 @@ namedtuple__replace(PyObject *self, PyObject *args, PyObject *kwargs)
     }
 
     if (PyDict_Size(kwargs)) {
-        tstr = PyUnicode_FromString("Got unexpected field names: %r");
         tkeys = PyDict_Keys(kwargs);
-        ttuple = PyTuple_Pack(1, tkeys);
-        Py_DECREF(tstr);
+        PyErr_Format(PyExc_ValueError, "Got unexpected field names: %R", tkeys);
         Py_DECREF(tkeys);
-        errstr = PyUnicode_Format(tstr, ttuple);
-        Py_DECREF(ttuple);
-        PyErr_SetObject(PyExc_ValueError, errstr);
         Py_DECREF(fields);
+        Py_DECREF(items);
         return NULL;
     }
 
-    ret = namedtuple__make((PyObject*) self->ob_type,
-                           Py_BuildValue("(N)", items),
-                           NULL);
     Py_DECREF(fields);
+
+    arg = PyTuple_Pack(1, items);
     Py_DECREF(items);
+    if (!arg) {
+        return NULL;
+    }
+    ret = namedtuple__make((PyObject*) self->ob_type, arg, NULL);
+    Py_DECREF(arg);
     return ret;
 }
 
@@ -1012,8 +1015,6 @@ add_indexers(PyObject *dict_, PyObject *fields)
 /* Cache the repr format string so we don't need to do this every time we call
    `namedtuple_repr`.
    return: Zero on succes, nonzero on failure. */
-// Cache the repr format string.
-// return: zero on success, nonzero on failure.
 static int
 cache_repr_fmt(PyObject *dict_, PyObject *fields)
 {
@@ -1097,8 +1098,22 @@ PyType_Spec namedtuple_spec = {
     namedtuple_slots,
 };
 
+static PyObject *
+tp_names_callback_func(PyObject *self, PyObject *ref)
+{
+    if (!tp_names) {
+        PyErr_SetString(PyExc_AssertionError, "tp_names is NULL");
+        return NULL;
+    }
+
+    if (PyDict_DelItem(tp_names, ref)) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 /* namedtuple factory function.
- * return: A new reference to a new namedtuple type or NULL on failure. */
+   return: A new reference to a new namedtuple type or NULL on failure. */
 static PyObject *
 namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
 {
@@ -1115,6 +1130,8 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     PyTypeObject *newtype;
     PyObject *globals;
     PyObject *module_name;
+    PyObject *qualname;
+    PyObject *ref;
     namedtuple_descr_wrapper *descr;
     PyObject *dict_;
     int err;
@@ -1140,73 +1157,11 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     }
 
     /* Validate and rename the `typename` and `field_names`. After this
-     * function, field_names` will point to a tuple of strings that is the
-     * split and renamed fields (if there are no errors). */
+       function, field_names` will point to a tuple of strings that is the
+       split and renamed fields (if there are no errors). */
     if (validate_field_names(typename, &field_names, rename, st->iskeyword)) {
         /* Invalid `field_names` or `typename`. */
         Py_DECREF(typename);
-        return NULL;
-    }
-
-    namedtuple_spec.name = PyUnicode_AsUTF8(typename);
-    newtype = (PyTypeObject*) PyType_FromSpec(&namedtuple_spec);
-    newtype->tp_name = PyUnicode_AsUTF8(((PyHeapTypeObject*) newtype)->ht_name);
-    Py_DECREF(typename);
-    if (!newtype) {
-        Py_DECREF(field_names);
-        return NULL;
-    }
-
-    dict_ = newtype->tp_dict;
-
-    /* Add indexers for each name. */
-    if (add_indexers(dict_, field_names)) {
-        Py_DECREF(field_names);
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-
-    /* Add the field descriptor. */
-    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
-                               &namedtuple_descr_wrapper_type))) {
-        Py_DECREF(field_names);
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-    descr->wr_wrapped = field_names;
-    err = PyDict_SetItemString(dict_, "_fields", (PyObject*) descr);
-    Py_DECREF(descr);
-    if (err) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-
-    /* Add an empty '__slots__' */
-    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
-                               &namedtuple_descr_wrapper_type))) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-    if (!(descr->wr_wrapped = PyTuple_New(0))) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-    err = PyDict_SetItemString(dict_, "__slots__", (PyObject*) descr);
-    Py_DECREF(descr);
-    if (err) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-
-    /* Add the `__reprfmt__` and `tp_doc`.*/
-    if (cache_repr_fmt(dict_, field_names)) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
-        return NULL;
-    }
-
-    /* set the asdict constructor */
-    if (PyDict_SetItemString(dict_, "__asdict__", st->asdict)) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
         return NULL;
     }
 
@@ -1216,15 +1171,110 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
         (module_name = PyDict_GetItemString(globals, "__name__"))) {
         Py_INCREF(module_name);
     }
-    else {
-        /* Default to an empty string. */
-        module_name = PyUnicode_InternFromString("");
+    /* Not defining a module is deprecated in >=3.5. We will set it to
+       "cnamedtuple.no_module" if we cannot find the module we are in. */
+    else if (!(module_name =
+               PyUnicode_InternFromString("cnamedtuple.no_module"))){
+        Py_DECREF(typename);
+        Py_DECREF(field_names);
+        return NULL;
     }
-    /* Replace the `__module__` with the actual module. */
-    err = PyDict_SetItemString(dict_, "__module__", module_name);
+
+    qualname = PyUnicode_FromFormat("%S.%U", module_name, typename);
+    Py_DECREF(typename);
     Py_DECREF(module_name);
+    if (!qualname) {
+        Py_DECREF(field_names);
+        return NULL;
+    }
+
+     /* We need to play with the memory around namedtuple_spec.name because
+       PyType_FromSpec assumes that the name is statically allocated.
+       Here we will point the name at the data for our qualname unicode object.
+       The name field now shares a lifetime as qualname because it points to
+       the same data. */
+    if (!(namedtuple_spec.name = PyUnicode_AsUTF8(qualname))) {
+        Py_DECREF(qualname);
+        Py_DECREF(field_names);
+        return NULL;
+    }
+    newtype = (PyTypeObject*) PyType_FromSpec(&namedtuple_spec);
+    namedtuple_spec.name = "";  /* set back to our sentinel */
+    if (!newtype) {
+        Py_DECREF(qualname);
+        Py_DECREF(field_names);
+        return NULL;
+    }
+
+    /* Store our qualname in weakkeydict such that when the type is collected
+       the tp_name will also be destroyed. */
+    if (!(ref = PyWeakref_NewRef((PyObject*) newtype, tp_names_callback))) {
+        Py_DECREF(qualname);
+        Py_DECREF(field_names);
+        Py_DECREF(newtype);
+        return NULL;
+    }
+    newtype->tp_name = PyUnicode_AsUTF8(qualname);
+    err = PyDict_SetItem(tp_names, ref, qualname);
+    Py_DECREF(ref);
+    Py_DECREF(qualname);
     if (err) {
-        PyType_Type.tp_dealloc((PyObject*) newtype);
+        Py_DECREF(field_names);
+        Py_DECREF(newtype);
+        return NULL;
+    }
+
+    dict_ = newtype->tp_dict;
+
+    /* Add indexers for each name. */
+    if (add_indexers(dict_, field_names)) {
+        Py_DECREF(field_names);
+        Py_DECREF(newtype);
+        return NULL;
+    }
+
+    /* Add the field descriptor. */
+    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
+                               &namedtuple_descr_wrapper_type))) {
+        Py_DECREF(field_names);
+        Py_DECREF(newtype);
+        return NULL;
+    }
+    descr->wr_wrapped = field_names;
+    err = PyDict_SetItemString(dict_, "_fields", (PyObject*) descr);
+    Py_DECREF(descr);
+    if (err) {
+        Py_DECREF(newtype);
+        return NULL;
+    }
+
+    /* Add an empty '__slots__' */
+    if (!(descr = PyObject_New(namedtuple_descr_wrapper,
+                               &namedtuple_descr_wrapper_type))) {
+        Py_DECREF(newtype);
+        return NULL;
+    }
+    if (!(descr->wr_wrapped = PyTuple_New(0))) {
+        Py_DECREF(newtype);
+        return NULL;
+    }
+    err = PyDict_SetItemString(dict_, "__slots__", (PyObject*) descr);
+    Py_DECREF(descr);
+    if (err) {
+        Py_DECREF(newtype);
+        return NULL;
+    }
+
+    /* Add the `__reprfmt__` and `tp_doc`.*/
+    if (cache_repr_fmt(dict_, field_names)) {
+        Py_DECREF(newtype);
+        return NULL;
+    }
+
+    /* set the asdict constructor */
+    if (PyDict_SetItemString(dict_, "__asdict__", st->asdict)) {
+        Py_DECREF(newtype);
+        return NULL;
     }
 
     return (PyObject*) newtype;
@@ -1290,6 +1340,7 @@ module_traverse(PyObject *self,visitproc visit,void *arg)
     if (!st) {
         return 1;
     }
+    Py_VISIT(st->iskeyword);
     Py_VISIT(st->asdict);
     return 0;
 }
@@ -1301,8 +1352,21 @@ module_clear(PyObject *self) {
     if (!st) {
         return 1;
     }
+    Py_CLEAR(st->iskeyword);
     Py_CLEAR(st->asdict);
     return 0;
+}
+
+void
+module_free(PyObject *self) {
+    module_state *st = PyModule_GetState(self);
+
+    if (!st) {
+        return;
+    }
+
+    Py_XDECREF(st->iskeyword);
+    Py_XDECREF(st->asdict);
 }
 
 PyDoc_STRVAR(module_doc,
@@ -1323,6 +1387,10 @@ static struct PyMethodDef module_functions[] = {
     {NULL},
 };
 
+static struct PyMethodDef tp_names_callback_methoddef = {
+    "_tp_names_callback", (PyCFunction) tp_names_callback_func, METH_O, "",
+};
+
 static struct PyModuleDef _namedtuplemodule = {
     PyModuleDef_HEAD_INIT,
     "_namedtuple",
@@ -1332,7 +1400,7 @@ static struct PyModuleDef _namedtuplemodule = {
     NULL,
     module_traverse,
     module_clear,
-    NULL
+    (freefunc) module_free,
 };
 
 PyMODINIT_FUNC
@@ -1342,31 +1410,55 @@ PyInit__namedtuple(void)
     PyObject *keyword_mod;
     module_state *st;
 
-    m = PyModule_Create(&_namedtuplemodule);
-    if (m == NULL) {
+    if (!(tp_names = PyDict_New())) {
         return NULL;
     }
+
+    if (!(tp_names_callback = PyCFunction_NewEx(&tp_names_callback_methoddef,
+                                                NULL,
+                                                NULL))) {
+        Py_DECREF(tp_names);
+        return NULL;
+    }
+
+    if (!(m = PyModule_Create(&_namedtuplemodule))) {
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
+        return NULL;
+    }
+
     if (!(st = PyModule_GetState(m))) {
         PyErr_SetString(PyExc_SystemError,"Module state is NULL");
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
         return NULL;
     }
 
-    if (PyType_Ready(&namedtuple_indexer_type) < 0)
+    if (PyType_Ready(&namedtuple_indexer_type) < 0) {
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
         return NULL;
-
-    if (PyType_Ready(&namedtuple_descr_wrapper_type) < 0)
+    }
+    if (PyType_Ready(&namedtuple_descr_wrapper_type) < 0) {
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
         return NULL;
+    }
 
     st->asdict = (PyObject*) &PyDict_Type;
     Py_INCREF(st->asdict);
 
     if (!(keyword_mod = PyImport_ImportModule("keyword"))) {
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
         Py_DECREF(m);
         return NULL;
     }
     st->iskeyword = PyObject_GetAttrString(keyword_mod, "iskeyword");
     Py_DECREF(keyword_mod);
     if (!st->iskeyword) {
+        Py_DECREF(tp_names);
+        Py_DECREF(tp_names_callback);
         Py_DECREF(m);
         return NULL;
     }
