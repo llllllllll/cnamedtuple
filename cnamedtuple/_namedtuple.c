@@ -8,13 +8,6 @@ typedef struct{
     PyObject *asdict;     /* The constructor called from `_asdict`. */
 }module_state;
 
-/* These are not in the module state because we need this around even if the
-   module is not. */
-static PyObject *tp_names_callback;  /* The callback to pass to ref. */
-static PyObject *tp_names;           /* dict mapping weakref objects to the
-                                        unicode objects supporting the tp_name
-                                        fields of the created types. */
-
 /* The type of the descriptors that access the named fields of the `namedtuple`
    types. */
 typedef struct{
@@ -1098,20 +1091,6 @@ PyType_Spec namedtuple_spec = {
     namedtuple_slots,
 };
 
-static PyObject *
-tp_names_callback_func(PyObject *self, PyObject *ref)
-{
-    if (!tp_names) {
-        PyErr_SetString(PyExc_AssertionError, "tp_names is NULL");
-        return NULL;
-    }
-
-    if (PyDict_DelItem(tp_names, ref)) {
-        return NULL;
-    }
-    Py_RETURN_NONE;
-}
-
 /* namedtuple factory function.
    return: A new reference to a new namedtuple type or NULL on failure. */
 static PyObject *
@@ -1131,7 +1110,6 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     PyObject *globals;
     PyObject *module_name;
     PyObject *qualname;
-    PyObject *ref;
     namedtuple_descr_wrapper *descr;
     PyObject *dict_;
     int err;
@@ -1191,7 +1169,7 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
      /* We need to play with the memory around namedtuple_spec.name because
        PyType_FromSpec assumes that the name is statically allocated.
        Here we will point the name at the data for our qualname unicode object.
-       The name field now shares a lifetime as qualname because it points to
+       The name field now shares a lifetime with qualname because it points to
        the same data. */
     if (!(namedtuple_spec.name = PyUnicode_AsUTF8(qualname))) {
         Py_DECREF(qualname);
@@ -1200,25 +1178,15 @@ namedtuple_factory(PyObject *self,PyObject *args,PyObject *kwargs)
     }
     newtype = (PyTypeObject*) PyType_FromSpec(&namedtuple_spec);
     namedtuple_spec.name = "";  /* set back to our sentinel */
+    Py_DECREF(qualname);  /* kill the qualname */
     if (!newtype) {
-        Py_DECREF(qualname);
         Py_DECREF(field_names);
         return NULL;
     }
-
-    /* Store our qualname in weakkeydict such that when the type is collected
-       the tp_name will also be destroyed. */
-    if (!(ref = PyWeakref_NewRef((PyObject*) newtype, tp_names_callback))) {
-        Py_DECREF(qualname);
-        Py_DECREF(field_names);
-        Py_DECREF(newtype);
-        return NULL;
-    }
-    newtype->tp_name = PyUnicode_AsUTF8(qualname);
-    err = PyDict_SetItem(tp_names, ref, qualname);
-    Py_DECREF(ref);
-    Py_DECREF(qualname);
-    if (err) {
+    /* make tp_name point to the memory allocated for ht_name so that it
+       shares a lifetime with the ht_name field. */
+    if (!(newtype->tp_name =
+          PyUnicode_AsUTF8(((PyHeapTypeObject*) newtype)->ht_name))) {
         Py_DECREF(field_names);
         Py_DECREF(newtype);
         return NULL;
@@ -1387,10 +1355,6 @@ static struct PyMethodDef module_functions[] = {
     {NULL},
 };
 
-static struct PyMethodDef tp_names_callback_methoddef = {
-    "_tp_names_callback", (PyCFunction) tp_names_callback_func, METH_O, "",
-};
-
 static struct PyModuleDef _namedtuplemodule = {
     PyModuleDef_HEAD_INIT,
     "_namedtuple",
@@ -1410,38 +1374,20 @@ PyInit__namedtuple(void)
     PyObject *keyword_mod;
     module_state *st;
 
-    if (!(tp_names = PyDict_New())) {
+    if (PyType_Ready(&namedtuple_indexer_type) < 0) {
         return NULL;
     }
-
-    if (!(tp_names_callback = PyCFunction_NewEx(&tp_names_callback_methoddef,
-                                                NULL,
-                                                NULL))) {
-        Py_DECREF(tp_names);
+    if (PyType_Ready(&namedtuple_descr_wrapper_type) < 0) {
         return NULL;
     }
 
     if (!(m = PyModule_Create(&_namedtuplemodule))) {
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
         return NULL;
     }
 
     if (!(st = PyModule_GetState(m))) {
         PyErr_SetString(PyExc_SystemError,"Module state is NULL");
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
-        return NULL;
-    }
-
-    if (PyType_Ready(&namedtuple_indexer_type) < 0) {
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
-        return NULL;
-    }
-    if (PyType_Ready(&namedtuple_descr_wrapper_type) < 0) {
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
+        Py_DECREF(m);
         return NULL;
     }
 
@@ -1449,16 +1395,12 @@ PyInit__namedtuple(void)
     Py_INCREF(st->asdict);
 
     if (!(keyword_mod = PyImport_ImportModule("keyword"))) {
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
         Py_DECREF(m);
         return NULL;
     }
     st->iskeyword = PyObject_GetAttrString(keyword_mod, "iskeyword");
     Py_DECREF(keyword_mod);
     if (!st->iskeyword) {
-        Py_DECREF(tp_names);
-        Py_DECREF(tp_names_callback);
         Py_DECREF(m);
         return NULL;
     }
