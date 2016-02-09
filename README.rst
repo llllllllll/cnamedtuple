@@ -1,9 +1,9 @@
-cnamedtuple 0.1.5
+cnamedtuple 0.1.6
 =================
 
 An implementation of namedtuple written in c for warp speed.
 
-Tested against Python3.4.2 and Python3.5 0a0.
+Tested against Python 3.4 and 3.5, and 3.6 as of ``3084914245d2``
 
 Warp Speed
 ----------
