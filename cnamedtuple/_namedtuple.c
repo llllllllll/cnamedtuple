@@ -748,8 +748,7 @@ checkfield(PyObject *iskeyword, PyObject *field)
 
     kind = PyUnicode_KIND(field);
     data = PyUnicode_DATA(field);
-
-    ch = PyUnicode_READ(kind,data,0);
+    ch = PyUnicode_READ(kind, data, 0);
 
     if (Py_UNICODE_ISDIGIT(ch)) {
         /* Cannot start with digit. */
@@ -760,15 +759,15 @@ checkfield(PyObject *iskeyword, PyObject *field)
         return CHECKFIELD_UNDERSCORE;
     }
 
+
     idx = PyUnicode_GET_LENGTH(field);
-    while (--idx) {
+    while (idx--) {
         ch = PyUnicode_READ(kind, data, idx);
         if (!(Py_UNICODE_ISALNUM(ch) || ch == (Py_UCS4) '_')) {
             /* Must be all alphanumeric characters or underscores. */
             return CHECKFIELD_NONALNUM;
         }
     }
-
 
     iskwd = ((iskwd_obj = PyObject_CallFunctionObjArgs(iskeyword,
                                                        field,
