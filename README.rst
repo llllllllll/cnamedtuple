@@ -25,7 +25,7 @@ Little numbers
 ~~~~~~~~~~~~~~
 
 Cute graphs
-^^^^^^^^^^^
+```````````
 
 These operations scale with the number of fields.
 
@@ -44,27 +44,37 @@ These operations scale with the number of fields.
 
 
 Less cute numbers
-^^^^^^^^^^^^^^^^^
+`````````````````
 
 These operations do not scale with number of fields.
 
 ``std_inst`` is an instance of a ``collections.namedtuple`` created type
 with six named fields: a, b, c, d, e, and f.
 
-.. code:: python
-
-    In [1]: %%timeit
-       ...: std_inst.c
-    10000000 loops, best of 3: 108 ns per loop
-
 ``c_inst`` is an instance of a ``cnamedtuple.namedtuple`` created type
 with six named fields: a, b, c, d, e, and f.
 
+Field Access
+''''''''''''
+
 .. code:: python
 
-    In [2]: %%timeit
-       ...: c_inst.c
-    10000000 loops, best of 3: 47.8 ns per loop
+   In [1]: %timeit std_inst.c
+   10000000 loops, best of 3: 71.9 ns per loop
+
+   In [2]: %timeit c_inst.c
+   10000000 loops, best of 3: 38.4 ns per loop
+
+
+Pickle Roundtrip
+''''''''''''''''
+
+   In [3]: %timeit loads(dumps(std_inst))
+   100000 loops, best of 3: 6.28 µs per loop
+
+   In [4]: %timeit loads(dumps(c_inst))
+   100000 loops, best of 3: 4.72 µs per loop
+
 
 Contributing
 ------------
