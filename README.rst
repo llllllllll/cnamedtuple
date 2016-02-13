@@ -69,6 +69,8 @@ Field Access
 Pickle Roundtrip
 ''''''''''''''''
 
+.. code:: python
+
    In [3]: %timeit loads(dumps(std_inst))
    100000 loops, best of 3: 6.28 µs per loop
 
