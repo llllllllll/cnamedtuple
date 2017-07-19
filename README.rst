@@ -3,12 +3,7 @@ cnamedtuple 0.1.6
 
 An implementation of namedtuple written in c for warp speed.
 
-Tested against Python 3.4 and 3.5, and 3.6 as of ``3084914245d2``
-
-Warp Speed
-----------
-
-Time to go fast.
+Tested against Python 3.4 and 3.5, and 3.6.
 
 Setup
 ~~~~~
@@ -43,8 +38,8 @@ These operations scale with the number of fields.
    Instance creation.
 
 
-Less cute numbers
-`````````````````
+Static numbers
+``````````````
 
 These operations do not scale with number of fields.
 
@@ -76,6 +71,17 @@ Pickle Roundtrip
 
    In [4]: %timeit loads(dumps(c_inst))
    100000 loops, best of 3: 4.72 µs per loop
+
+
+Benchmarks
+----------
+
+To compare ``cnamedtuple.namedtuple`` against ``collections.namedtuple``
+yourself, run:
+
+.. bash::
+
+   $ ./bench
 
 
 Contributing

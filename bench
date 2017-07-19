@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+import os
+import statistics
+from string import ascii_letters
+import subprocess
+import sys
+
+import perf
+
+
+def argname(n):
+    if not n:
+        return ascii_letters[0]
+
+    out = ''
+    while n:
+        n, ix = divmod(n, len(ascii_letters))
+        out += ascii_letters[ix]
+    return out
+
+
+def test_type_creation_string():
+    'type creation from string with %d field(s)'
+    for n in range(1, 257):
+        yield (
+            '',
+            "namedtuple('Type', '%s')" % ' '.join(
+                map(argname, range(n)),
+            ),
+            n,
+        )
+
+
+def test_type_creation_sequence():
+    'type creation from sequence with %d field(s)'
+    for n in range(1, 257):
+        yield (
+            '',
+            "namedtuple('Type', [%r]')" % ' '.join(
+                map(argname, range(n)),
+            ),
+            n,
+        )
+
+
+def test_instance_creation_positional():
+    'type instance creation with positional arguments and %d field(s)'
+    for n in range(1, 257):
+        yield (
+            "Type = namedtuple('Type', [%r]')" % ' '.join(
+                map(argname, range(n)),
+            ),
+            'Type(%s)' % ', '.join(range(n)),
+            n + 1,
+        )
+
+
+def test_instance_creation_keyword():
+    'type instance creation with keyword arguments and %d field(s)'
+    for n in range(1, 257):
+        argnames = list(map(argname, range(n)))
+        yield (
+            "Type = namedtuple('Type', [%r]')" % ' '.join(argnames),
+            'Type(%s)' % ', '.join(
+                '%s=%r' % (a, n) for n, a in enumerate(argnames)
+            ),
+            n,
+        )
+
+
+def test_field_access():
+    'field access'
+    yield (
+        "Type = namedtuple('Type', 'a b c');instance = Type(0, 1, 2)",
+        'instance.b',
+    )
+
+
+def run_test(test):
+    for setup, command, *args in test():
+        print(': '.join((test.__doc__ % tuple(args), command)))
+        print('  collections: ', end='', flush=True)
+        collections = timeit(
+            command,
+            setup='from collections import namedtuple;%s' % setup,
+        )
+        print(collections.format())
+        print('  cnamedtuple: ', end='', flush=True)
+        cnamedtuple = timeit(
+            command,
+            setup='from cnamedtuple import namedtuple;%s' % setup,
+        )
+        print(cnamedtuple.format())
+        difference = collections.median() / cnamedtuple.median()
+        print('  difference:  %.2f\n' % difference)
+        yield difference
+
+
+def timeit(command, *, setup=''):
+    read, write = os.pipe()
+    subprocess.run(
+        [
+            sys.executable,
+            '-m', 'perf',
+            'timeit',
+            '-s', setup,
+            '--pipe', str(write),
+            command,
+        ],
+        pass_fds=[write],
+    )
+    os.close(write)
+    with open(read) as f:
+        data = f.read()
+
+    return perf.Benchmark.loads(data)
+
+
+def main():
+    print('Running with: Python %s\n' % sys.version.replace('\n', ''))
+    differences = []
+    ns = globals().copy()
+    for k, v in ns.items():
+        if k.startswith('test_'):
+            differences.extend(run_test(v))
+
+    print('\nmedian difference: %.2f' % statistics.median(differences))
+
+
+if __name__ == '__main__':
+    main()
