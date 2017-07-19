@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+import argparse
 import os
+import re
 import statistics
 from string import ascii_letters
 import subprocess
@@ -19,65 +21,65 @@ def argname(n):
     return out
 
 
-def test_type_creation_string():
+def test_type_creation_string(fields):
     'type creation from string with %d field(s)'
-    for n in range(1, 257):
+    for n in range(1, fields + 1):
         yield (
             '',
-            "namedtuple('Type', '%s')" % ' '.join(
+            "namedtuple('NT', '%s')" % ' '.join(
                 map(argname, range(n)),
             ),
             n,
         )
 
 
-def test_type_creation_sequence():
+def test_type_creation_sequence(fields):
     'type creation from sequence with %d field(s)'
-    for n in range(1, 257):
+    for n in range(1, fields + 1):
         yield (
             '',
-            "namedtuple('Type', [%r]')" % ' '.join(
+            "namedtuple('NT', [%r])" % ' '.join(
                 map(argname, range(n)),
             ),
             n,
         )
 
 
-def test_instance_creation_positional():
+def test_instance_creation_positional(fields):
     'type instance creation with positional arguments and %d field(s)'
-    for n in range(1, 257):
+    for n in range(1, fields + 1):
         yield (
-            "Type = namedtuple('Type', [%r]')" % ' '.join(
+            "NT = namedtuple('NT', [%r])" % ' '.join(
                 map(argname, range(n)),
             ),
-            'Type(%s)' % ', '.join(range(n)),
-            n + 1,
+            'NT(%s)' % ', '.join(map(str, range(n))),
+            n,
         )
 
 
-def test_instance_creation_keyword():
+def test_instance_creation_keyword(fields):
     'type instance creation with keyword arguments and %d field(s)'
-    for n in range(1, 257):
+    for n in range(1, fields + 1):
         argnames = list(map(argname, range(n)))
         yield (
-            "Type = namedtuple('Type', [%r]')" % ' '.join(argnames),
-            'Type(%s)' % ', '.join(
+            "NT = namedtuple('NT', [%r])" % ' '.join(argnames),
+            'NT(%s)' % ', '.join(
                 '%s=%r' % (a, n) for n, a in enumerate(argnames)
             ),
             n,
         )
 
 
-def test_field_access():
+def test_field_access(fields):
     'field access'
     yield (
-        "Type = namedtuple('Type', 'a b c');instance = Type(0, 1, 2)",
+        "NT = namedtuple('NT', 'a b c');instance = NT(0, 1, 2)",
         'instance.b',
     )
 
 
-def run_test(test):
-    for setup, command, *args in test():
+def run_test(test, fields):
+    for setup, command, *args in test(fields):
         print(': '.join((test.__doc__ % tuple(args), command)))
         print('  collections: ', end='', flush=True)
         collections = timeit(
@@ -91,9 +93,9 @@ def run_test(test):
             setup='from cnamedtuple import namedtuple;%s' % setup,
         )
         print(cnamedtuple.format())
-        difference = collections.median() / cnamedtuple.median()
-        print('  difference:  %.2f\n' % difference)
-        yield difference
+        ratio = collections.median() / cnamedtuple.median()
+        print('  ratio:       %.2f\n' % ratio)
+        yield ratio
 
 
 def timeit(command, *, setup=''):
@@ -117,14 +119,33 @@ def timeit(command, *, setup=''):
 
 
 def main():
+    parser = argparse.ArgumentParser('cnamedtuple benchmark suite')
+    parser.add_argument(
+        '-k',
+        default='',
+        help='Run tests matching this regex.',
+    )
+    parser.add_argument(
+        '-n',
+        type=int,
+        default=8,
+        help='Run tests up to ``n`` fields.'
+    )
+
+    args = parser.parse_args()
+    pattern = re.compile(args.k)
+
     print('Running with: Python %s\n' % sys.version.replace('\n', ''))
-    differences = []
+    ratio = []
     ns = globals().copy()
     for k, v in ns.items():
-        if k.startswith('test_'):
-            differences.extend(run_test(v))
+        if k.startswith('test_') and pattern.match(k):
+            ratio.extend(run_test(v, args.n))
 
-    print('\nmedian difference: %.2f' % statistics.median(differences))
+    if ratio:
+        print('\nmedian ratio: %.2f' % statistics.median(ratio))
+    else:
+        print('no tests selected')
 
 
 if __name__ == '__main__':
