@@ -960,7 +960,7 @@ validate_field_names(PyObject *typename,
         switch(PySet_Contains(seen, field)) {
         case 1:
             PyErr_Format(PyExc_ValueError, seen_fmt, field);
-            /* explicit fallthrough */
+            /* fallthrough */
         case -1:
             Py_DECREF(fields);
             Py_DECREF(seen);
