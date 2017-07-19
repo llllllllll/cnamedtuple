@@ -38,8 +38,8 @@ def test_type_creation_sequence(fields):
     for n in range(1, fields + 1):
         yield (
             '',
-            "namedtuple('NT', [%r])" % ' '.join(
-                map(argname, range(n)),
+            "namedtuple('NT', [%s])" % ', '.join(
+                map(lambda a: repr(argname(a)), range(n)),
             ),
             n,
         )
@@ -49,8 +49,8 @@ def test_instance_creation_positional(fields):
     'type instance creation with positional arguments and %d field(s)'
     for n in range(1, fields + 1):
         yield (
-            "NT = namedtuple('NT', [%r])" % ' '.join(
-                map(argname, range(n)),
+            "NT = namedtuple('NT', [%s])" % ', '.join(
+                map(lambda a: repr(argname(a)), range(n)),
             ),
             'NT(%s)' % ', '.join(map(str, range(n))),
             n,
@@ -62,7 +62,7 @@ def test_instance_creation_keyword(fields):
     for n in range(1, fields + 1):
         argnames = list(map(argname, range(n)))
         yield (
-            "NT = namedtuple('NT', [%r])" % ' '.join(argnames),
+            "NT = namedtuple('NT', [%s])" % ', '.join(map(repr, argnames)),
             'NT(%s)' % ', '.join(
                 '%s=%r' % (a, n) for n, a in enumerate(argnames)
             ),
